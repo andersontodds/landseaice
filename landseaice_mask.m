@@ -51,6 +51,7 @@ mask = struct("lat_mesh", latmesh, ...
     "File_URL", ncURL);
 
 % save("LSI_mask.mat", "mask");
+save("LSI_mask_vars.mat", "latmesh", "lonmesh", "lsi", "ncfile", "ncURL");
 
 %% plot
 
