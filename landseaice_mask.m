@@ -28,20 +28,54 @@ alt = alt';
 [lonmesh, latmesh] = meshgrid(lon, lat);
 
 %% check for land, sea and ice
-lsi = zeros(size(alt));
-lsi(alt <= 0) = -1; % sea
-lsi(alt > 0) = 1;   % land
-lsi(lsi==1 & latmesh < -60) = 0; % ice: antarctica including ice shelves
+lsi = -1*ones(size(alt));
+%lsi(alt <= 0) = -1; % sea
+%lsi(alt > 0) = 1;   % land
+%lsi(lsi==1 & latmesh < -60) = 0; % ice: antarctica including ice shelves
 
-% get Antarctica and Greenland coastline polygons from coastlines.mat
+% sort coastlines by number of vertices; make new version with only
+% polygons with at least ??? vertices
 load coastlines;
-cl_ant = 1:739;
-cl_grl = 3977:4210;
+nansep = find(isnan(coastlon));
+nvert_poly = zeros(length(nansep)+1, 1);
+nvert = zeros(length(coastlon), 1);
+nvert_poly(1) = length(coastlon(1:nansep(1)));
+nvert(1:nansep(1)) = nvert_poly(1);
+for i = 2:length(nansep)
+    nvert_poly(i) = length(coastlon(nansep(i-1):nansep(i)));
+    nvert(nansep(i-1):nansep(i)) = nvert_poly(i);
+end
+nvert_poly(end) = length(coastlon(nansep(end):end));
+nvert(nansep(end):end) = nvert_poly(end);
 
-% check if geographic points are inside polygon
-in_ant = inpolygon(lonmesh(:), latmesh(:), coastlon(cl_ant), coastlat(cl_ant));
-in_grl = inpolygon(lonmesh(:), latmesh(:), coastlon(cl_grl), coastlat(cl_grl));
-lsi(in_ant | in_grl) = 0;
+coastpoly = [coastlat coastlon nvert];
+coastpoly = cat(1, [NaN NaN nvert(1)], coastpoly);
+coastpoly = sortrows(coastpoly, 3, "descend");
+
+nvert_poly_desc = unique(coastpoly(:,3), 'stable');
+
+nvert_threshold = 15;
+
+% check if geographic points are inside polygon; assign inside points land
+% value
+in_cont = inpolygon(lonmesh(:), latmesh(:), coastpoly(coastpoly(:,3)>nvert_threshold,2), coastpoly(coastpoly(:,3)>nvert_threshold,1));
+lsi(in_cont) = 1;
+% patch up eastern Russia
+lsi(alt>0 & latmesh > 58 & lonmesh < -168) = 1;
+
+% assign Antarctic and Greenland regions ice value
+lsi(alt>0 & latmesh < -60) = 0; % ice: antarctica including ice shelves
+in_grl = inpolygon(lonmesh(:), latmesh(:), coastpoly(coastpoly(:,3)==nvert_poly_desc(6), 2), coastpoly(coastpoly(:,3)==nvert_poly_desc(6), 1));
+lsi(in_grl) = 0;    % ice: greenland
+
+% %% get Antarctica and Greenland coastline polygons from coastlines.mat
+% cl_ant = 1:739;
+% cl_grl = 3977:4210;
+% 
+% % check if geographic points are inside polygon
+% in_ant = inpolygon(lonmesh(:), latmesh(:), coastlon(cl_ant), coastlat(cl_ant));
+% in_grl = inpolygon(lonmesh(:), latmesh(:), coastlon(cl_grl), coastlat(cl_grl));
+% lsi(in_ant | in_grl) = 0;
 
 %% save land-sea-ice mask
 mask = struct("lat_mesh", latmesh, ...
@@ -50,8 +84,8 @@ mask = struct("lat_mesh", latmesh, ...
     "ETOPO1_filename", ncfile, ...
     "File_URL", ncURL);
 
-% save("LSI_mask.mat", "mask");
-save("LSI_mask_vars.mat", "latmesh", "lonmesh", "lsi", "ncfile", "ncURL");
+save("LSI_mask.mat", "mask");
+% save("LSI_mask_vars.mat", "latmesh", "lonmesh", "lsi", "ncfile", "ncURL");
 
 %% plot
 
@@ -68,17 +102,16 @@ crameri('bukavu', 'pivot', 0);
 c1.Label.String = "elevation (m)";
 
 figure(2)
-hold off
-worldmap("World");
+worldmap("World")
 geoshow(latmesh, lonmesh, lsi, "DisplayType", "texturemap");
 hold on
-geoshow(coastlat, coastlon, "color", "black");
-
+geoshow(coastpoly(:,1), coastpoly(:,2), "color", "black")
+% geoshow(coastpoly(:,1), coastpoly(:,2), "color", "red")
+% geoshow(coastpoly(coastpoly(:,3)>nvert_threshold,1), coastpoly(coastpoly(:,3)>nvert_threshold,2), "color", "black")
 c1 = colorbar();
 caxis([-2 2]);
 c1.Ticks = [-1, 0, 1];
 c1.TickLabels = {'sea','ice','land'};
 crameri('broc', 'pivot', 0);
-%c1.Label.String = "land-sea-ice mask";
 
-title("1-degree Land-Sea-Ice mask based on ETOPO1 elevation")
+title("1-degree Land-Sea-Ice mask based on coastline polygons and ETOPO1 elevation")
