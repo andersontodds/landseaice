@@ -7,8 +7,9 @@ Generate land/sea/ice masks from ETOPO1 or other data, for use in VLF radio prop
 
 Although this mask is an improvement on the previous version, there are still several clear errors:
 
-1. Seasonal sea ice is entirely missing.
+1. Seasonal sea ice is entirely missing
 2. Ice shelves in Antarctica may be undersized
+3. All bodies of water (of sufficient size) are assigned the same mask value
 
 The next version of this mask will need to incorporate seasonal ice extent data.
 
